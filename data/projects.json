@@ -1,0 +1,32 @@
+[
+  {
+    "id": 1,
+    "name": "E-commerce Frontend",
+    "type": "web",
+    "description": "Interface utilisateur d'une boutique en ligne moderne : catalogue, panier, paiement et espace client.",
+    "url": "/site1",
+    "tags": ["React", "CSS", "E-commerce"],
+    "status": "UP",
+    "updatedAt": "2025-03-10"
+  },
+  {
+    "id": 2,
+    "name": "Site 2",
+    "type": "web",
+    "description": "Description courte du projet 2. Remplacez ce texte par une présentation adaptée.",
+    "url": "/site2",
+    "tags": ["JavaScript", "HTML"],
+    "status": "DEGRADED",
+    "updatedAt": "2025-02-15"
+  },
+  {
+    "id": 3,
+    "name": "Site 3",
+    "type": "web",
+    "description": "Description courte du projet 3. Remplacez ce texte par une présentation adaptée.",
+    "url": "/site3",
+    "tags": ["Vue", "Node.js"],
+    "status": "DOWN",
+    "updatedAt": "2025-01-20"
+  }
+]
