@@ -1,269 +1,144 @@
 <!DOCTYPE html>
-<html lang="fr">
+<html lang="fr" data-theme="dark">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Portail — Mes Projets</title>
-  <style>
-    /* ── Reset & base ─────────────────────────────────────── */
-    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-
-    :root {
-      --bg:        #f5f5f7;
-      --surface:   #ffffff;
-      --border:    #e2e2e7;
-      --text:      #1d1d1f;
-      --muted:     #6e6e73;
-      --accent:    #0071e3;
-      --accent-h:  #0077ed;
-      --radius:    16px;
-      --shadow:    0 2px 12px rgba(0,0,0,.07);
-      --shadow-h:  0 8px 32px rgba(0,0,0,.13);
-      --transition: .25s cubic-bezier(.4,0,.2,1);
-    }
-
-    html { scroll-behavior: smooth; }
-
-    body {
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
-                   Helvetica, Arial, sans-serif;
-      background: var(--bg);
-      color: var(--text);
-      min-height: 100vh;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-    }
-
-    /* ── Header ───────────────────────────────────────────── */
-    header {
-      width: 100%;
-      text-align: center;
-      padding: 72px 24px 40px;
-      opacity: 0;
-      transform: translateY(-20px);
-      animation: fadeUp .6s var(--transition) .1s forwards;
-    }
-
-    header h1 {
-      font-size: clamp(2rem, 5vw, 3.2rem);
-      font-weight: 700;
-      letter-spacing: -.5px;
-      line-height: 1.15;
-    }
-
-    header p {
-      margin-top: 12px;
-      font-size: 1.05rem;
-      color: var(--muted);
-      max-width: 480px;
-      margin-left: auto;
-      margin-right: auto;
-    }
-
-    /* ── Grid ─────────────────────────────────────────────── */
-    main {
-      width: 100%;
-      max-width: 1080px;
-      padding: 0 24px 80px;
-      display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
-      gap: 20px;
-    }
-
-    /* ── Card ─────────────────────────────────────────────── */
-    .card {
-      display: flex;
-      flex-direction: column;
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-radius: var(--radius);
-      padding: 28px 28px 24px;
-      text-decoration: none;
-      color: inherit;
-      box-shadow: var(--shadow);
-      transition:
-        transform var(--transition),
-        box-shadow var(--transition),
-        border-color var(--transition);
-      /* staggered entrance animation driven by CSS custom property */
-      opacity: 0;
-      transform: translateY(24px);
-      animation: fadeUp .5s var(--transition) calc(.2s + var(--i, 0) * .08s) forwards;
-    }
-
-    .card:hover {
-      transform: translateY(-4px);
-      box-shadow: var(--shadow-h);
-      border-color: var(--accent);
-    }
-
-    .card:focus-visible {
-      outline: 3px solid var(--accent);
-      outline-offset: 3px;
-    }
-
-    /* number badge */
-    .card__num {
-      font-size: .72rem;
-      font-weight: 600;
-      letter-spacing: .08em;
-      text-transform: uppercase;
-      color: var(--accent);
-      background: #e8f1fb;
-      border-radius: 8px;
-      padding: 4px 10px;
-      width: fit-content;
-      margin-bottom: 18px;
-    }
-
-    .card__title {
-      font-size: 1.2rem;
-      font-weight: 600;
-      margin-bottom: 8px;
-      line-height: 1.3;
-    }
-
-    .card__desc {
-      font-size: .9rem;
-      color: var(--muted);
-      line-height: 1.6;
-      flex: 1;
-    }
-
-    .card__arrow {
-      margin-top: 22px;
-      display: flex;
-      align-items: center;
-      gap: 6px;
-      font-size: .88rem;
-      font-weight: 500;
-      color: var(--accent);
-      transition: gap var(--transition);
-    }
-
-    .card:hover .card__arrow { gap: 10px; }
-
-    .card__arrow svg {
-      width: 16px;
-      height: 16px;
-      stroke: var(--accent);
-      stroke-width: 2;
-      fill: none;
-      stroke-linecap: round;
-      stroke-linejoin: round;
-      flex-shrink: 0;
-      transition: transform var(--transition);
-    }
-
-    .card:hover .card__arrow svg { transform: translateX(3px); }
-
-    /* ── Footer ───────────────────────────────────────────── */
-    footer {
-      margin-top: auto;
-      padding: 24px;
-      font-size: .82rem;
-      color: var(--muted);
-      text-align: center;
-    }
-
-    /* ── Keyframes ────────────────────────────────────────── */
-    @keyframes fadeUp {
-      to { opacity: 1; transform: translateY(0); }
-    }
-
-    /* ── Dark‑mode support ────────────────────────────────── */
-    @media (prefers-color-scheme: dark) {
-      :root {
-        --bg:       #111113;
-        --surface:  #1c1c1e;
-        --border:   #2c2c2e;
-        --text:     #f5f5f7;
-        --muted:    #98989f;
-        --shadow:   0 2px 12px rgba(0,0,0,.4);
-        --shadow-h: 0 8px 32px rgba(0,0,0,.6);
-      }
-      .card__num { background: #0d2a45; }
-    }
-  </style>
+  <meta name="description" content="Portail de projets Clickdroit — dashboard engineering." />
+  <title>Dashboard — Clickdroit</title>
+  <link rel="stylesheet" href="assets/css/styles.css" />
 </head>
 <body>
 
-  <header>
-    <h1>Mes Projets</h1>
-    <p>Hub central — choisissez un projet pour y accéder.</p>
+  <!-- ── En-tête ─────────────────────────────────────────────────────────── -->
+  <header role="banner">
+    <div class="header__brand">
+      <span class="header__logo" aria-hidden="true">⬡</span>
+      <h1>Clickdroit Portal</h1>
+      <span class="header__env" aria-label="Environnement : production">PROD</span>
+    </div>
+    <div class="header__controls">
+      <button id="theme-toggle"
+              aria-label="Thème actuel : sombre — appuyer pour changer (t)"
+              aria-pressed="true">☀</button>
+    </div>
   </header>
 
-  <main>
+  <!-- ── Layout ──────────────────────────────────────────────────────────── -->
+  <div class="layout">
 
-    <!--
-      ╔══════════════════════════════════════════════════╗
-      ║  Pour ajouter une carte :                        ║
-      ║  1. Copiez le bloc <a class="card"> … </a>       ║
-      ║  2. Mettez à jour href, --i, le numéro,          ║
-      ║     le titre et la description.                  ║
-      ╚══════════════════════════════════════════════════╝
-    -->
+    <!-- Barre latérale : métriques + terminal -->
+    <aside class="sidebar" role="complementary" aria-label="Panneau système">
 
-    <!-- Carte 1 -->
-    <a class="card" href="/site1" style="--i:0">
-      <span class="card__num">01</span>
-      <h2 class="card__title">E-commerce Frontend</h2>
-      <p class="card__desc">
-        Interface utilisateur d'une boutique en ligne moderne : catalogue,
-        panier, paiement et espace client.
-      </p>
-      <span class="card__arrow">
-        Visiter
-        <svg viewBox="0 0 24 24" aria-hidden="true">
-          <polyline points="9 18 15 12 9 6"/>
-        </svg>
-      </span>
-    </a>
+      <!-- Métriques -->
+      <section class="panel metrics-panel" aria-labelledby="metrics-title">
+        <h2 class="panel__title" id="metrics-title">// METRICS</h2>
+        <ul class="metrics-list" role="list">
+          <li>
+            <span class="metric__label">UPTIME</span>
+            <span class="metric__value" id="metric-uptime" aria-live="polite" aria-atomic="true">—</span>
+          </li>
+          <li>
+            <span class="metric__label">LATENCY</span>
+            <span class="metric__value" id="metric-latency" aria-live="polite" aria-atomic="true">—</span>
+          </li>
+          <li>
+            <span class="metric__label">REQUESTS</span>
+            <span class="metric__value" id="metric-requests" aria-live="polite" aria-atomic="true">—</span>
+          </li>
+          <li>
+            <span class="metric__label">VERSION</span>
+            <span class="metric__value">v2.0.0</span>
+          </li>
+          <li>
+            <span class="metric__label">ENV</span>
+            <span class="metric__value env-badge">PROD</span>
+          </li>
+        </ul>
+      </section>
 
-    <!-- Carte 2 -->
-    <a class="card" href="/site2" style="--i:1">
-      <span class="card__num">02</span>
-      <h2 class="card__title">Site 2</h2>
-      <p class="card__desc">
-        Description courte du projet 2. Remplacez ce texte par une présentation
-        adaptée.
-      </p>
-      <span class="card__arrow">
-        Visiter
-        <svg viewBox="0 0 24 24" aria-hidden="true">
-          <polyline points="9 18 15 12 9 6"/>
-        </svg>
-      </span>
-    </a>
+      <!-- Terminal simulé -->
+      <section class="panel terminal-panel" aria-labelledby="terminal-title">
+        <h2 class="panel__title" id="terminal-title">// TERMINAL</h2>
+        <div id="terminal-output"
+             role="log"
+             aria-live="polite"
+             aria-label="Sortie du terminal"
+             aria-relevant="additions"></div>
+        <div class="terminal-input-line">
+          <span class="terminal-prompt" aria-hidden="true">❯</span>
+          <label for="terminal-input" class="sr-only">Commande terminal</label>
+          <input type="text"
+                 id="terminal-input"
+                 autocomplete="off"
+                 spellcheck="false"
+                 placeholder="help"
+                 aria-describedby="terminal-title" />
+        </div>
+      </section>
 
-    <!-- Carte 3 -->
-    <a class="card" href="/site3" style="--i:2">
-      <span class="card__num">03</span>
-      <h2 class="card__title">Site 3</h2>
-      <p class="card__desc">
-        Description courte du projet 3. Remplacez ce texte par une présentation
-        adaptée.
-      </p>
-      <span class="card__arrow">
-        Visiter
-        <svg viewBox="0 0 24 24" aria-hidden="true">
-          <polyline points="9 18 15 12 9 6"/>
-        </svg>
-      </span>
-    </a>
+    </aside>
 
-  </main>
+    <!-- Zone de contenu principale -->
+    <div class="content">
 
-  <footer>
-    &copy; <span id="yr"></span> Clickdroit — Tous droits réservés
+      <!-- Barre d'outils : recherche, filtres, tri -->
+      <div class="toolbar" role="search" aria-label="Recherche et filtres projets">
+        <div class="search-box">
+          <span class="search-icon" aria-hidden="true">⌕</span>
+          <label for="search" class="sr-only">Rechercher des projets</label>
+          <input type="search"
+                 id="search"
+                 placeholder="Rechercher… (appuyer sur / pour focus)"
+                 aria-label="Rechercher des projets" />
+        </div>
+        <div class="filters" id="tag-filters" role="group" aria-label="Filtrer par technologie">
+          <button class="filter-btn active"
+                  data-filter="all"
+                  aria-pressed="true">Tous</button>
+        </div>
+        <div>
+          <label for="sort-select" class="sr-only">Trier par</label>
+          <select id="sort-select" aria-label="Trier les projets par">
+            <option value="index">Ordre défaut</option>
+            <option value="name">Nom (A–Z)</option>
+            <option value="status">Statut</option>
+            <option value="date">Mise à jour</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- Grille de projets (générée par JS) -->
+      <main id="projects-grid"
+            role="main"
+            aria-label="Projets"
+            aria-live="polite"
+            aria-relevant="all"></main>
+
+      <!-- Timeline / journal d'événements -->
+      <section class="panel timeline-panel" aria-labelledby="timeline-title">
+        <h2 class="panel__title" id="timeline-title">// EVENT LOG</h2>
+        <div id="timeline"
+             role="list"
+             aria-live="polite"
+             aria-label="Journal des événements système"
+             aria-relevant="additions"></div>
+      </section>
+
+    </div>
+  </div>
+
+  <!-- ── Pied de page ─────────────────────────────────────────────────────── -->
+  <footer role="contentinfo">
+    <span>&copy; <span id="yr"></span> Clickdroit — Tous droits réservés</span>
+    <span class="footer__shortcuts" aria-label="Raccourcis clavier disponibles">
+      Raccourcis :
+      <kbd title="Focus recherche">/</kbd> recherche ·
+      <kbd title="Changer de thème">t</kbd> thème ·
+      <kbd title="Ouvrir projet (g puis numéro)">g+n</kbd> ouvrir projet
+    </span>
   </footer>
 
-  <script>
-    // Inject current year into footer
-    const yrEl = document.getElementById('yr');
-    if (yrEl) yrEl.textContent = new Date().getFullYear();
-  </script>
+  <script src="assets/js/main.js" defer type="module"></script>
 
 </body>
 </html>
