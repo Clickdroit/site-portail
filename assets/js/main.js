@@ -62,7 +62,7 @@ async function refreshHealth() {
 
 async function fetchHealthData() {
   try {
-    const res = await fetch('/api/health', { cache: 'no-store' });
+    const res = await fetch('/api/v1/health', { cache: 'no-store' });
     if (!res.ok) return null;
     const data = await res.json();
 
