@@ -1,6 +1,6 @@
 /**
  * terminal.js — Terminal simulé avec historique localStorage et auto-complétion.
- * Commandes disponibles : help, list, open <n>, theme <dark|light>, clear.
+ * Commandes disponibles : help, list, open <n>, status, theme <dark|light>, clear.
  */
 
 import { applyTheme, getTheme } from './theme.js';
@@ -12,7 +12,7 @@ const MAX_HISTORY = 50;
 let history = [];
 let historyIndex = -1;
 
-const COMMANDS = ['help', 'list', 'open', 'theme', 'clear'];
+const COMMANDS = ['help', 'list', 'open', 'status', 'theme', 'clear'];
 
 /** Initialise le terminal. */
 export function initTerminal() {
@@ -30,14 +30,14 @@ export function initTerminal() {
 }
 
 /** Gère les touches clavier du terminal. */
-function handleKey(e, input, output) {
+async function handleKey(e, input, output) {
   if (e.key === 'Enter') {
     const cmd = input.value.trim();
     if (cmd) {
       pushHistory(cmd);
       historyIndex = -1;
       printLine(output, `<span class="t-prompt">❯</span> <span class="t-cmd">${escapeHtml(cmd)}</span>`);
-      const result = execute(cmd);
+      const result = await execute(cmd);
       if (result) printLine(output, result);
     }
     input.value = '';
@@ -78,7 +78,7 @@ function handleKey(e, input, output) {
 function handleAutocomplete() {}
 
 /** Exécute une commande et retourne la sortie HTML. */
-function execute(raw) {
+async function execute(raw) {
   const parts = raw.trim().split(/\s+/);
   const cmd = parts[0].toLowerCase();
   const args = parts.slice(1);
@@ -90,6 +90,8 @@ function execute(raw) {
       return cmdList();
     case 'open':
       return cmdOpen(args);
+    case 'status':
+      return await cmdStatus();
     case 'theme':
       return cmdTheme(args);
     case 'clear':
@@ -106,6 +108,7 @@ function cmdHelp() {
   &nbsp;&nbsp;<em>help</em>         — affiche cette aide<br>
   &nbsp;&nbsp;<em>list</em>         — liste les projets<br>
   &nbsp;&nbsp;<em>open &lt;n&gt;</em>    — ouvre le projet n°n<br>
+  &nbsp;&nbsp;<em>status</em>       — uptime réel des conteneurs (API health)<br>
   &nbsp;&nbsp;<em>theme &lt;dark|light&gt;</em> — change le thème<br>
   &nbsp;&nbsp;<em>clear</em>        — vide le terminal<br>
   <span class="t-muted">Raccourcis: ↑/↓ historique · Tab complétion</span>
@@ -140,6 +143,38 @@ function cmdOpen(args) {
     return `<span class="t-error">Projet n°${n} introuvable. Utilisez <em>list</em> pour voir les projets.</span>`;
   }
   return `<span class="t-output">Ouverture de <strong>${escapeHtml(project.name)}</strong>…</span>`;
+}
+
+async function cmdStatus() {
+  try {
+    const res = await fetch('/api/health', { cache: 'no-store' });
+    if (!res.ok) {
+      return `<span class="t-error">Health-check indisponible (HTTP ${res.status}).</span>`;
+    }
+
+    const data = await res.json();
+    const services = Array.isArray(data.services) ? data.services : [];
+
+    if (!services.length) {
+      const uptime = data.uptime ? ` — uptime global: <strong>${escapeHtml(String(data.uptime))}</strong>` : '';
+      return `<span class="t-output">Aucun détail service/conteneur fourni par l'endpoint /api/health${uptime}.</span>`;
+    }
+
+    const rows = services
+      .map(formatServiceStatusLine)
+      .join('<br>');
+
+    return `<span class="t-output"><strong>Status conteneurs :</strong><br>${rows}</span>`;
+  } catch {
+    return '<span class="t-error">Impossible de contacter /api/health.</span>';
+  }
+}
+
+function formatServiceStatusLine(service) {
+  const name = escapeHtml(service.name || service.id || service.url || 'service');
+  const uptime = escapeHtml(String(service.uptime ?? service.uptimeHuman ?? 'n/a'));
+  const status = escapeHtml(String(service.status ?? 'unknown').toUpperCase());
+  return `  <span class="t-muted">${name}</span> → <strong>${uptime}</strong> <span class="t-muted">(${status})</span>`;
 }
 
 function cmdTheme(args) {

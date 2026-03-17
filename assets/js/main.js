@@ -5,7 +5,7 @@
 
 import { initTheme, toggleTheme } from './modules/theme.js';
 import { initTerminal } from './modules/terminal.js';
-import { initProjects, openProject } from './modules/projects.js';
+import { getProjects, initProjects, openProject, updateProjectHealth } from './modules/projects.js';
 
 // ── Initialisation ────────────────────────────────────────────────────────────
 
@@ -13,7 +13,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   initTheme();
   await initProjects();
   initTerminal();
-  initMetrics();
+  initHealthMonitoring();
   initTimeline();
   initKeyboardShortcuts();
   initYear();
@@ -27,53 +27,143 @@ function initYear() {
   if (el) el.textContent = new Date().getFullYear();
 }
 
-// ── Métriques simulées ────────────────────────────────────────────────────────
+// ── Métriques & health-check ──────────────────────────────────────────────────
 
-function initMetrics() {
-  updateMetric('metric-uptime', () => (99.9 + Math.random() * 0.09).toFixed(2) + '%');
-  updateMetric('metric-latency', () => Math.floor(8 + Math.random() * 20) + ' ms');
-  updateMetric('metric-requests', () => Math.floor(1200 + Math.random() * 400) + '/min');
+const HEALTH_POLL_INTERVAL_MS = 10000;
+let latestHealth = null;
 
-  // Rafraîchissement toutes les 5 s
-  setInterval(() => {
-    updateMetric('metric-uptime', () => (99.9 + Math.random() * 0.09).toFixed(2) + '%');
-    updateMetric('metric-latency', () => Math.floor(8 + Math.random() * 20) + ' ms');
-    updateMetric('metric-requests', () => Math.floor(1200 + Math.random() * 400) + '/min');
-  }, 5000);
+async function initHealthMonitoring() {
+  await refreshHealth();
+  setInterval(refreshHealth, HEALTH_POLL_INTERVAL_MS);
 }
 
-function updateMetric(id, valueFn) {
-  const el = document.getElementById(id);
-  if (el) el.textContent = valueFn();
-}
+async function refreshHealth() {
+  const startedAt = performance.now();
+  const healthData = await fetchHealthData();
+  // Évite une latence "0 ms" visuellement trompeuse lors d'une réponse quasi instantanée.
+  const elapsedMs = Math.max(1, Math.round(performance.now() - startedAt));
 
-// ── Timeline d'événements simulés ────────────────────────────────────────────
-
-const LOG_EVENTS = [
-  { level: 'INFO', msg: 'Portail démarré avec succès.' },
-  { level: 'INFO', msg: 'Données projets chargées depuis data/projects.json.' },
-  { level: 'WARN', msg: 'Site 2 : latence élevée détectée (>200ms).' },
-  { level: 'ERROR', msg: 'Site 3 : health-check échoué — statut DOWN.' },
-  { level: 'INFO', msg: 'Thème initialisé depuis localStorage.' },
-  { level: 'INFO', msg: 'Terminal prêt.' },
-];
-
-let logIndex = 0;
-
-function initTimeline() {
-  const container = document.getElementById('timeline');
-  if (!container) return;
-
-  // Affichage progressif des logs simulés
-  function addNextLog() {
-    if (logIndex >= LOG_EVENTS.length) return;
-    const { level, msg } = LOG_EVENTS[logIndex++];
-    addLogEntry(container, level, msg);
-    const delay = 600 + Math.random() * 800;
-    setTimeout(addNextLog, delay);
+  if (healthData) {
+    latestHealth = healthData;
   }
 
-  addNextLog();
+  const uptime = healthData?.uptime ?? latestHealth?.uptime ?? '—';
+  const requests = healthData?.requests ?? latestHealth?.requests ?? '—';
+  const latency = healthData?.latency ? `${healthData.latency} ms` : `${elapsedMs} ms`;
+
+  updateMetric('metric-uptime', formatUptime(uptime));
+  updateMetric('metric-latency', latency);
+  updateMetric('metric-requests', formatRequests(requests));
+
+  const updates = healthData?.services ?? (await probeProjectUrls());
+  updateProjectHealth(updates);
+  pushStatusChangeLogs();
+}
+
+async function fetchHealthData() {
+  try {
+    const res = await fetch('/api/health', { cache: 'no-store' });
+    if (!res.ok) return null;
+    const data = await res.json();
+
+    const services = Array.isArray(data.services)
+      ? data.services.map(service => ({
+          id: service.id,
+          name: service.name,
+          url: service.url || service.path,
+          status: normalizeStatus(service.status),
+          uptime: service.uptime ?? service.uptimeHuman
+        }))
+      : [];
+
+    return {
+      uptime: data.uptime ?? data.metrics?.uptime,
+      latency: toInt(data.latency ?? data.metrics?.latency),
+      requests: data.requestsPerMin ?? data.metrics?.requestsPerMin,
+      services: services.filter(s => s.status)
+    };
+  } catch {
+    return null;
+  }
+}
+
+async function probeProjectUrls() {
+  const projects = getProjects();
+  if (!projects.length) return [];
+
+  const checks = projects.map(async project => {
+    const status = await checkProjectUrl(project.url);
+    return {
+      id: project.id,
+      name: project.name,
+      url: project.url,
+      status
+    };
+  });
+
+  return Promise.all(checks);
+}
+
+async function checkProjectUrl(url) {
+  try {
+    const res = await fetch(url, { method: 'HEAD', cache: 'no-store' });
+    if (res.ok) return 'UP';
+    if (res.status >= 500) return 'DOWN';
+    return 'DEGRADED';
+  } catch {
+    return 'DOWN';
+  }
+}
+
+function updateMetric(id, value) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  if (el.textContent === value) return;
+  el.textContent = value;
+  el.classList.remove('metric--updated');
+  // Force un reflow pour redémarrer l'animation CSS quand la valeur change.
+  void el.offsetWidth;
+  el.classList.add('metric--updated');
+}
+
+// ── Timeline d'événements ─────────────────────────────────────────────────────
+
+let timelineContainer = null;
+const projectStatusById = new Map();
+
+function initTimeline() {
+  timelineContainer = document.getElementById('timeline');
+  if (!timelineContainer) return;
+
+  addLogEntry(timelineContainer, 'INFO', 'Portail démarré avec succès.');
+  addLogEntry(timelineContainer, 'INFO', 'Données projets chargées depuis data/projects.json.');
+
+  getProjects().forEach(project => {
+    projectStatusById.set(project.id, project.status);
+    const level = project.status === 'DOWN' ? 'ERROR' : project.status === 'DEGRADED' ? 'WARN' : 'INFO';
+    addLogEntry(timelineContainer, level, `${project.name} : statut initial ${project.status}.`);
+  });
+}
+
+function pushStatusChangeLogs() {
+  if (!timelineContainer) return;
+
+  getProjects().forEach(project => {
+    const previous = projectStatusById.get(project.id);
+    if (!previous) {
+      projectStatusById.set(project.id, project.status);
+      return;
+    }
+    if (previous === project.status) return;
+
+    projectStatusById.set(project.id, project.status);
+    const level = project.status === 'DOWN' ? 'ERROR' : project.status === 'DEGRADED' ? 'WARN' : 'INFO';
+    addLogEntry(
+      timelineContainer,
+      level,
+      `${project.name} : statut ${previous} → ${project.status}.`
+    );
+  });
 }
 
 function addLogEntry(container, level, msg) {
@@ -174,4 +264,30 @@ function escapeHtml(str) {
     .replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;')
     .replace(/'/g, '&#39;');
+}
+
+function normalizeStatus(status) {
+  const value = String(status || '').toUpperCase();
+  if (value === 'UP' || value === 'DEGRADED' || value === 'DOWN') return value;
+  if (value === 'OK' || value === 'HEALTHY') return 'UP';
+  if (value === 'WARNING') return 'DEGRADED';
+  if (value === 'KO' || value === 'ERROR' || value === 'UNHEALTHY') return 'DOWN';
+  return null;
+}
+
+function formatUptime(value) {
+  if (value == null || value === '') return '—';
+  if (typeof value === 'number') return `${value.toFixed(2)}%`;
+  return String(value);
+}
+
+function formatRequests(value) {
+  if (value == null || value === '') return '—';
+  if (typeof value === 'number') return `${value}/min`;
+  return String(value);
+}
+
+function toInt(value) {
+  const n = Number.parseInt(value, 10);
+  return Number.isNaN(n) ? null : n;
 }

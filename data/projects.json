@@ -11,9 +11,9 @@
   },
   {
     "id": 2,
-    "name": "Site 2",
+    "name": "Blog Corporate",
     "type": "web",
-    "description": "Description courte du projet 2. Remplacez ce texte par une présentation adaptée.",
+    "description": "Site éditorial de Clickdroit : actualités, guides juridiques et pages institutionnelles.",
     "url": "/site2",
     "tags": ["JavaScript", "HTML"],
     "status": "DEGRADED",
@@ -21,12 +21,22 @@
   },
   {
     "id": 3,
-    "name": "Site 3",
+    "name": "Espace Partenaires",
     "type": "web",
-    "description": "Description courte du projet 3. Remplacez ce texte par une présentation adaptée.",
+    "description": "Portail B2B pour les partenaires avec accès aux ressources, tickets et rapports d'activité.",
     "url": "/site3",
     "tags": ["Vue", "Node.js"],
     "status": "DOWN",
     "updatedAt": "2025-01-20"
+  },
+  {
+    "id": 4,
+    "name": "E-commerce API Docs",
+    "type": "api",
+    "description": "Documentation Swagger/OpenAPI de l'API e-commerce pour intégration et debug.",
+    "url": "/api/v1/docs",
+    "tags": ["API", "Swagger", "E-commerce"],
+    "status": "UP",
+    "updatedAt": "2026-03-17"
   }
 ]
