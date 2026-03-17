@@ -168,6 +168,43 @@ export function getProjects() {
   return allProjects;
 }
 
+/** Met à jour dynamiquement les statuts/uptime des projets puis re-rend la grille. */
+export function updateProjectHealth(updates = []) {
+  if (!Array.isArray(updates) || !updates.length) return;
+
+  const byId = new Map();
+  const byName = new Map();
+  const byUrl = new Map();
+
+  allProjects.forEach(project => {
+    byId.set(String(project.id), project);
+    byName.set(project.name.trim().toLowerCase(), project);
+    byUrl.set(normalizePath(project.url), project);
+  });
+
+  let changed = false;
+
+  updates.forEach(update => {
+    const id = update.id != null ? String(update.id) : null;
+    const name = update.name ? String(update.name).trim().toLowerCase() : null;
+    const url = update.url ? normalizePath(update.url) : null;
+
+    const project = (id && byId.get(id)) || (name && byName.get(name)) || (url && byUrl.get(url));
+    if (!project) return;
+
+    if (update.status && project.status !== update.status) {
+      project.status = update.status;
+      changed = true;
+    }
+
+    if (update.uptime) {
+      project.runtimeUptime = String(update.uptime);
+    }
+  });
+
+  if (changed) renderProjects();
+}
+
 /** Ouvre le projet par index 1-based (pour les raccourcis clavier et terminal). */
 export function openProject(num) {
   const project = allProjects[num - 1];
@@ -186,6 +223,15 @@ function escapeHtml(str) {
     .replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;')
     .replace(/'/g, '&#39;');
+}
+
+function normalizePath(value) {
+  try {
+    const url = new URL(value, window.location.origin);
+    return url.pathname.replace(/\/+$/, '') || '/';
+  } catch {
+    return String(value || '').replace(/\/+$/, '') || '/';
+  }
 }
 
 /** Expose setFilter pour usage externe (terminal, main). */

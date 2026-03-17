@@ -251,6 +251,10 @@ header {
   color: var(--accent);
 }
 
+.metric__value.metric--updated {
+  animation: metricFlash .5s ease;
+}
+
 .metric__value.env-badge {
   font-size: .65rem;
   letter-spacing: .1em;
@@ -650,6 +654,21 @@ footer {
   to { opacity: 1; transform: translateY(0); }
 }
 
+@keyframes metricFlash {
+  0% {
+    text-shadow: 0 0 0 transparent;
+    filter: brightness(1);
+  }
+  35% {
+    text-shadow: 0 0 12px var(--accent);
+    filter: brightness(1.35);
+  }
+  100% {
+    text-shadow: 0 0 0 transparent;
+    filter: brightness(1);
+  }
+}
+
 /* ── Responsive ─────────────────────────────────────────────────────────────── */
 @media (max-width: 768px) {
   .layout {
@@ -690,4 +709,32 @@ footer {
   header { padding: 0 16px; }
   .header__brand h1 { display: none; }
   #projects-grid { grid-template-columns: 1fr; }
+}
+
+/* ── Page 404 ────────────────────────────────────────────────────────────────── */
+.not-found-page {
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+}
+
+.not-found-card {
+  width: min(640px, 100%);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  padding: 28px;
+}
+
+.not-found-card h1 {
+  color: var(--heading);
+  font-family: var(--font-mono);
+  margin-bottom: 10px;
+}
+
+.not-found-card p {
+  color: var(--muted);
+  margin-bottom: 14px;
 }
