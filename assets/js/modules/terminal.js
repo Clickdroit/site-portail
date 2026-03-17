@@ -147,7 +147,7 @@ function cmdOpen(args) {
 
 async function cmdStatus() {
   try {
-    const res = await fetch('/api/health', { cache: 'no-store' });
+    const res = await fetch('/api/v1/health', { cache: 'no-store' });
     if (!res.ok) {
       return `<span class="t-error">Health-check indisponible (HTTP ${res.status}).</span>`;
     }
