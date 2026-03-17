@@ -4,10 +4,10 @@
     "name": "E-commerce Frontend",
     "type": "web",
     "description": "Interface utilisateur d'une boutique en ligne moderne : catalogue, panier, paiement et espace client.",
-    "url": "/site1",
+    "url": "/site-ecommerce",
     "tags": ["React", "CSS", "E-commerce"],
     "status": "UP",
-    "updatedAt": "2025-03-10"
+    "updatedAt": "2026-03-17"
   },
   {
     "id": 2,
