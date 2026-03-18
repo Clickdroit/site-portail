@@ -49,7 +49,7 @@ Chaque projet est décrit par :
 ## Fonctionnalités
 
 ### Dashboard engineering
-- **Métriques health-check** (uptime, latence, requêtes/min) rafraîchies automatiquement via `/api/health` (fallback par probe URL des projets).
+- **Métriques health-check** (uptime, latence, requêtes/min) rafraîchies automatiquement via `/api/v1/health` (fallback par probe URL des projets).
 - **Badges de statut** par projet : `UP` (vert), `DEGRADED` (orange), `DOWN` (rouge).
 - **Journal d'événements** (event log) avec niveaux INFO / WARN / ERROR.
 
@@ -71,7 +71,7 @@ Commandes disponibles depuis la barre latérale :
 | `help`                | Affiche la liste des commandes              |
 | `list`                | Liste les projets avec leur statut          |
 | `open <n>`            | Ouvre le projet n°n                         |
-| `status`              | Affiche l'uptime réel exposé par `/api/health` |
+| `status`              | Affiche l'uptime réel exposé par `/api/v1/health` |
 | `theme dark|light`    | Change le thème                             |
 | `clear`               | Vide l'output du terminal                   |
 

@@ -183,7 +183,7 @@
     // Redirect if already logged in
     const token = localStorage.getItem('portal-token');
     if (token) {
-      fetch('/portal/api/auth/me', {
+      fetch('/api/v1/auth/me', {
         headers: { 'Authorization': 'Bearer ' + token }
       })
       .then(res => { if (res.ok) window.location.href = 'index.html'; })
@@ -204,7 +204,7 @@
       const password = document.getElementById('login-password').value;
 
       try {
-        const res = await fetch('/portal/api/auth/login', {
+        const res = await fetch('/api/v1/auth/login', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ username, password })
