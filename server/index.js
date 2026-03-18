@@ -40,9 +40,9 @@ app.use(express.json());
 
 // ── API Routes ──────────────────────────────────────────
 
-app.use('/api/v1/projects', projectRoutes);
-app.use('/api/v1/health', healthRoutes);
-app.use('/api/v1/auth', authRoutes);
+app.use('/portal/api/projects', projectRoutes);
+app.use('/portal/api/health', healthRoutes);
+app.use('/portal/api/auth', authRoutes);
 
 // ── Serve static frontend ───────────────────────────────
 
@@ -55,7 +55,7 @@ app.use(express.static(frontendPath, {
 // Fallback: serve index.html for SPA-like navigation
 app.get('*', (req, res, next) => {
   // Don't intercept API routes
-  if (req.path.startsWith('/api/')) return next();
+  if (req.path.startsWith('/portal/api/')) return next();
 
   const filePath = path.join(frontendPath, req.path);
   res.sendFile(filePath, (err) => {

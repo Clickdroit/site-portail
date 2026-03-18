@@ -90,7 +90,7 @@ async function loadCharts(projectId) {
   const headers = token ? { 'Authorization': 'Bearer ' + token } : {};
 
   try {
-    const res = await fetch(`/api/v1/projects/${projectId}/history?hours=24`, {
+    const res = await fetch(`/portal/api/projects/${projectId}/history?hours=24`, {
       headers, cache: 'no-store'
     });
 
