@@ -42,7 +42,7 @@ async function checkAuth() {
   if (!token) return false;
 
   try {
-    const res = await fetch('/portal/api/auth/me', {
+    const res = await fetch('/api/v1/auth/me', {
       headers: { 'Authorization': 'Bearer ' + token }
     });
     if (!res.ok) {
@@ -152,7 +152,7 @@ async function handleLogin(e) {
   const password = document.getElementById('login-password')?.value;
 
   try {
-    const res = await fetch('/portal/api/auth/login', {
+    const res = await fetch('/api/v1/auth/login', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ username, password })
@@ -220,7 +220,7 @@ async function fetchHealthData() {
     const token = localStorage.getItem('portal-token');
     const headers = token ? { 'Authorization': 'Bearer ' + token } : {};
 
-    const res = await fetch('/portal/api/health', { cache: 'no-store', headers });
+    const res = await fetch('/api/v1/health', { cache: 'no-store', headers });
     if (!res.ok) return null;
     const data = await res.json();
 

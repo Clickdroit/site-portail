@@ -40,9 +40,16 @@ app.use(express.json());
 
 // ── API Routes ──────────────────────────────────────────
 
-app.use('/portal/api/projects', projectRoutes);
-app.use('/portal/api/health', healthRoutes);
-app.use('/portal/api/auth', authRoutes);
+function mountApiRoutes(prefix) {
+  app.use(`${prefix}/projects`, projectRoutes);
+  app.use(`${prefix}/health`, healthRoutes);
+  app.use(`${prefix}/auth`, authRoutes);
+}
+
+// Primary API prefix used by the connected ecommerce projects
+mountApiRoutes('/api/v1');
+// Backward compatibility with older portal frontend URLs
+mountApiRoutes('/portal/api');
 
 // ── Serve static frontend ───────────────────────────────
 
@@ -55,7 +62,7 @@ app.use(express.static(frontendPath, {
 // Fallback: serve index.html for SPA-like navigation
 app.get('*', (req, res, next) => {
   // Don't intercept API routes
-  if (req.path.startsWith('/portal/api/')) return next();
+  if (req.path.startsWith('/portal/api/') || req.path.startsWith('/api/v1/')) return next();
 
   const filePath = path.join(frontendPath, req.path);
   res.sendFile(filePath, (err) => {

@@ -255,7 +255,7 @@ async function handleLogs(socket, args, role) {
       `[${new Date().toISOString()}] Connected to database`,
       `[${new Date().toISOString()}] Health check: OK`,
       `[${new Date().toISOString()}] GET / 200 12ms`,
-      `[${new Date().toISOString()}] GET /api/health 200 3ms`,
+      `[${new Date().toISOString()}] GET /api/v1/health 200 3ms`,
     ];
 
     for (const line of mockLogs) {
