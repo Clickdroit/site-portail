@@ -24,7 +24,7 @@ async function waitForServer() {
 
   while (Date.now() < deadline) {
     try {
-      const res = await fetch(`${baseUrl}/api/v1/health`);
+      const res = await fetch(`${baseUrl}/portal/api/health`);
       if (res.ok) return;
     } catch {
       // server not ready yet
@@ -78,8 +78,8 @@ describe('API route prefixes', () => {
     }
   });
 
-  test('serves health endpoint on /api/v1', async () => {
-    const res = await fetch(`${baseUrl}/api/v1/health`);
+  test('serves health endpoint on /portal/api', async () => {
+    const res = await fetch(`${baseUrl}/portal/api/health`);
     expect(res.status).toBe(200);
     const payload = await res.json();
     expect(payload).toHaveProperty('status', 'ok');
