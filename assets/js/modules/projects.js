@@ -18,7 +18,7 @@ export async function initProjects() {
     const token = localStorage.getItem('portal-token');
     const headers = token ? { 'Authorization': 'Bearer ' + token } : {};
 
-    const res = await fetch('/api/v1/projects', { headers });
+    const res = await fetch('/portal/api/projects', { headers });
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     allProjects = await res.json();
   } catch {

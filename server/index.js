@@ -46,8 +46,6 @@ function mountApiRoutes(prefix) {
   app.use(`${prefix}/auth`, authRoutes);
 }
 
-// Primary API prefix used by the connected ecommerce projects
-mountApiRoutes('/api/v1');
 // Backward compatibility with older portal frontend URLs
 mountApiRoutes('/portal/api');
 
@@ -62,7 +60,7 @@ app.use(express.static(frontendPath, {
 // Fallback: serve index.html for SPA-like navigation
 app.get('*', (req, res, next) => {
   // Don't intercept API routes
-  if (req.path.startsWith('/portal/api/') || req.path.startsWith('/api/v1/')) return next();
+  if (req.path.startsWith('/portal/api/')) return next();
 
   const filePath = path.join(frontendPath, req.path);
   res.sendFile(filePath, (err) => {
@@ -83,8 +81,8 @@ app.get('*', (req, res, next) => {
     console.log('');
     console.log('  ╔══════════════════════════════════════════╗');
     console.log('  ║   Clickdroit Portal — Server v2.0.0      ║');
-    console.log(`  ║   http://localhost:${PORT}                  ║`);
-    console.log('  ║   API: /api/v1/health | /api/v1/projects ║');
+    console.log(`  ║   http://localhost:${PORT}               ║`);
+    console.log('  ║   API: /portal/api/health                ║');
     console.log('  ╚══════════════════════════════════════════╝');
     console.log('');
   });
