@@ -6,8 +6,133 @@
   <meta name="description" content="Portail de projets Clickdroit — dashboard engineering." />
   <title>Dashboard — Clickdroit</title>
   <link rel="stylesheet" href="assets/css/styles.css" />
+  <!-- Apache ECharts for data visualization -->
+  <script src="https://cdn.jsdelivr.net/npm/echarts@5/dist/echarts.min.js" defer></script>
+  <!-- Socket.io client (served by the backend) -->
+  <script src="/socket.io/socket.io.js" defer></script>
+  <style>
+    /* ── Boot splash animation ─────────────────────────── */
+    .boot-splash {
+      position: fixed;
+      inset: 0;
+      z-index: 9999;
+      background: var(--bg);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: opacity .5s ease, visibility .5s ease;
+    }
+
+    .boot-splash.boot--done {
+      opacity: 0;
+      visibility: hidden;
+      pointer-events: none;
+    }
+
+    .boot-terminal {
+      width: min(520px, 90vw);
+      background: var(--t-bg);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      box-shadow: 0 16px 48px rgba(0,0,0,.5);
+      overflow: hidden;
+    }
+
+    .boot-terminal__bar {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 10px 14px;
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+    }
+
+    .boot-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+    }
+    .boot-dot--r { background: var(--down); }
+    .boot-dot--y { background: var(--degraded); }
+    .boot-dot--g { background: var(--up); }
+
+    .boot-terminal__bar span:last-child {
+      margin-left: auto;
+      font-family: var(--font-mono);
+      font-size: .7rem;
+      color: var(--muted);
+    }
+
+    .boot-terminal__body {
+      padding: 18px 16px;
+      font-family: var(--font-mono);
+      font-size: .82rem;
+      line-height: 1.8;
+      color: var(--t-text);
+      min-height: 180px;
+    }
+
+    .boot-line {
+      opacity: 0;
+      animation: bootFadeIn .15s ease forwards;
+    }
+
+    .boot-prompt { color: var(--t-prompt); }
+    .boot-accent { color: var(--accent); }
+    .boot-success { color: var(--up); }
+    .boot-muted { color: var(--t-muted); }
+
+    .boot-cursor {
+      display: inline-block;
+      width: 8px;
+      height: 1em;
+      background: var(--t-prompt);
+      margin-left: 2px;
+      vertical-align: text-bottom;
+      animation: blink 1s step-end infinite;
+    }
+
+    @keyframes blink { 50% { opacity: 0; } }
+    @keyframes bootFadeIn { to { opacity: 1; } }
+
+    /* Password dots animation */
+    .boot-password {
+      color: var(--heading);
+      letter-spacing: 3px;
+    }
+
+    /* Progress bar */
+    .boot-progress {
+      height: 2px;
+      background: var(--border);
+      border-radius: 1px;
+      margin: 8px 0;
+      overflow: hidden;
+    }
+
+    .boot-progress__bar {
+      height: 100%;
+      width: 0%;
+      background: var(--accent);
+      border-radius: 1px;
+      transition: width .3s ease;
+    }
+  </style>
 </head>
 <body>
+
+  <!-- ── Boot splash screen ──────────────────────────────────────────────── -->
+  <div class="boot-splash" id="boot-splash">
+    <div class="boot-terminal">
+      <div class="boot-terminal__bar">
+        <span class="boot-dot boot-dot--r"></span>
+        <span class="boot-dot boot-dot--y"></span>
+        <span class="boot-dot boot-dot--g"></span>
+        <span>clickdroit — bash</span>
+      </div>
+      <div class="boot-terminal__body" id="boot-output"></div>
+    </div>
+  </div>
 
   <!-- ── En-tête ─────────────────────────────────────────────────────────── -->
   <header role="banner">
@@ -17,9 +142,19 @@
       <span class="header__env" aria-label="Environnement : production">PROD</span>
     </div>
     <div class="header__controls">
+      <!-- User info (populated by JS when logged in) -->
+      <div class="header__user" id="header-user" style="display:none">
+        <span class="header__username" id="header-username"></span>
+        <span class="header__role-badge" id="header-role"></span>
+      </div>
+      <!-- Login button (visible when not logged in) -->
+      <button id="login-btn" class="header__login-btn" style="display:none"
+              aria-label="Se connecter">Connexion</button>
       <button id="theme-toggle"
               aria-label="Thème actuel : sombre — appuyer pour changer (t)"
               aria-pressed="true">☀</button>
+      <button id="logout-btn" class="header__logout-btn" style="display:none"
+              aria-label="Se déconnecter" title="Se déconnecter">⏻</button>
     </div>
   </header>
 
@@ -56,9 +191,11 @@
         </ul>
       </section>
 
-      <!-- Terminal simulé -->
+      <!-- Terminal -->
       <section class="panel terminal-panel" aria-labelledby="terminal-title">
-        <h2 class="panel__title" id="terminal-title">// TERMINAL</h2>
+        <h2 class="panel__title" id="terminal-title">// TERMINAL
+          <span class="terminal-ws-status" id="ws-status" title="WebSocket">⚡</span>
+        </h2>
         <div id="terminal-output"
              role="log"
              aria-live="polite"
@@ -127,6 +264,72 @@
     </div>
   </div>
 
+  <!-- ── Modal détail projet (charts ECharts) ────────────────────────────── -->
+  <div class="modal-backdrop" id="project-modal" aria-hidden="true" role="dialog"
+       aria-labelledby="modal-title" aria-modal="true">
+    <div class="modal-panel">
+      <div class="modal-header">
+        <h2 class="modal-title" id="modal-title">Projet</h2>
+        <button class="modal-close" id="modal-close" aria-label="Fermer">✕</button>
+      </div>
+      <div class="modal-body">
+        <div class="modal-project-info" id="modal-project-info"></div>
+        <div class="modal-charts">
+          <div class="chart-container">
+            <h3 class="chart-title">Latence (dernières 24h)</h3>
+            <div id="chart-latency" class="chart-box"></div>
+          </div>
+          <div class="chart-container">
+            <h3 class="chart-title">Historique de statut</h3>
+            <div id="chart-uptime" class="chart-box"></div>
+          </div>
+        </div>
+        <div class="modal-actions">
+          <a id="modal-visit-link" class="modal-visit-btn" href="#" target="_blank" rel="noopener">
+            Visiter le projet
+            <svg viewBox="0 0 24 24" aria-hidden="true"><polyline points="9 18 15 12 9 6"/></svg>
+          </a>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Modal de connexion ──────────────────────────────────────────────── -->
+  <div class="modal-backdrop" id="login-modal" aria-hidden="true" role="dialog"
+       aria-labelledby="login-modal-title" aria-modal="true">
+    <div class="modal-panel" style="width: min(420px, 92vw);">
+      <div class="modal-header">
+        <h2 class="modal-title" id="login-modal-title">Connexion</h2>
+        <button class="modal-close" id="login-modal-close" aria-label="Fermer">✕</button>
+      </div>
+      <div class="modal-body">
+        <form id="login-form" style="display:flex;flex-direction:column;gap:18px;">
+          <div class="login-field">
+            <label for="login-username" style="font-family:var(--font-mono);font-size:.72rem;font-weight:700;letter-spacing:.08em;color:var(--muted);text-transform:uppercase;">Utilisateur</label>
+            <input type="text" id="login-username" autocomplete="username"
+                   placeholder="admin" required
+                   style="padding:10px 14px;background:var(--surface-2);border:1px solid var(--border);border-radius:var(--radius-sm);color:var(--text);font-size:.9rem;" />
+          </div>
+          <div class="login-field">
+            <label for="login-password" style="font-family:var(--font-mono);font-size:.72rem;font-weight:700;letter-spacing:.08em;color:var(--muted);text-transform:uppercase;">Mot de passe</label>
+            <input type="password" id="login-password" autocomplete="current-password"
+                   placeholder="••••••••" required
+                   style="padding:10px 14px;background:var(--surface-2);border:1px solid var(--border);border-radius:var(--radius-sm);color:var(--text);font-size:.9rem;" />
+          </div>
+          <p id="login-error" role="alert" aria-live="polite"
+             style="color:var(--down);font-size:.82rem;text-align:center;min-height:1.5em;font-family:var(--font-mono);margin:0;"></p>
+          <button type="submit" id="login-submit"
+                  style="padding:12px;background:var(--accent);color:#0d0f14;border:none;border-radius:var(--radius-sm);font-family:var(--font-mono);font-size:.85rem;font-weight:700;letter-spacing:.05em;cursor:pointer;">
+            Se connecter
+          </button>
+          <p style="text-align:center;font-size:.72rem;color:var(--muted);margin:0;">
+            Défaut : <code style="background:var(--surface-2);padding:1px 5px;border-radius:3px;border:1px solid var(--border);">admin</code> / <code style="background:var(--surface-2);padding:1px 5px;border-radius:3px;border:1px solid var(--border);">admin</code>
+          </p>
+        </form>
+      </div>
+    </div>
+  </div>
+
   <!-- ── Pied de page ─────────────────────────────────────────────────────── -->
   <footer role="contentinfo">
     <span>&copy; <span id="yr"></span> Clickdroit — Tous droits réservés</span>
@@ -137,6 +340,103 @@
       <kbd title="Ouvrir projet (g puis numéro)">g+n</kbd> ouvrir projet
     </span>
   </footer>
+
+  <!-- Web Component definitions -->
+  <script src="assets/js/components/status-badge.js" defer></script>
+  <script src="assets/js/components/project-card.js" defer></script>
+
+  <!-- Boot animation script (runs before main.js) -->
+  <script>
+    (function() {
+      // Skip boot animation if already seen this session
+      if (sessionStorage.getItem('portal-booted')) {
+        const splash = document.getElementById('boot-splash');
+        if (splash) splash.classList.add('boot--done');
+        return;
+      }
+
+      const output = document.getElementById('boot-output');
+      if (!output) return;
+
+      const lines = [
+        { text: '<span class="boot-prompt">$</span> ssh portal@clickdroit.io', delay: 0 },
+        { text: '<span class="boot-muted">Connecting to 167.172.175.193...</span>', delay: 400 },
+        { text: '<span class="boot-success">✓ Connection established</span>', delay: 700 },
+        { text: '', delay: 200 },
+        { text: '<span class="boot-prompt">$</span> sudo portal --authenticate', delay: 300 },
+        { text: '<span class="boot-muted">Password:</span> <span class="boot-password" id="boot-pw"></span><span class="boot-cursor" id="boot-cursor"></span>', delay: 400, isPassword: true },
+        { text: '', delay: 800 },
+        { text: '<span class="boot-success">✓ Access granted — role: ADMIN</span>', delay: 300 },
+        { text: '', delay: 100 },
+        { text: '<span class="boot-prompt">$</span> portal start --env production', delay: 300 },
+        { text: '<span class="boot-muted">Loading modules...</span>', delay: 300 },
+        { text: '<div class="boot-progress"><div class="boot-progress__bar" id="boot-progress"></div></div>', delay: 100, isProgress: true },
+        { text: '<span class="boot-success">✓ Dashboard ready</span>', delay: 400 },
+      ];
+
+      let totalDelay = 300;
+
+      lines.forEach((line, i) => {
+        totalDelay += line.delay;
+        setTimeout(() => {
+          const div = document.createElement('div');
+          div.className = 'boot-line';
+          div.style.animationDelay = '0s';
+          div.innerHTML = line.text;
+          output.appendChild(div);
+
+          // Password typing animation
+          if (line.isPassword) {
+            typePassword();
+          }
+
+          // Progress bar animation
+          if (line.isProgress) {
+            animateProgress();
+          }
+        }, totalDelay);
+      });
+
+      // Fade out splash after all lines
+      totalDelay += 600;
+      setTimeout(() => {
+        const splash = document.getElementById('boot-splash');
+        if (splash) splash.classList.add('boot--done');
+        sessionStorage.setItem('portal-booted', '1');
+      }, totalDelay);
+
+      function typePassword() {
+        const el = document.getElementById('boot-pw');
+        const cursor = document.getElementById('boot-cursor');
+        if (!el) return;
+        const chars = '••••••••';
+        let i = 0;
+        const interval = setInterval(() => {
+          if (i < chars.length) {
+            el.textContent += chars[i];
+            i++;
+          } else {
+            clearInterval(interval);
+            if (cursor) cursor.style.display = 'none';
+          }
+        }, 70);
+      }
+
+      function animateProgress() {
+        const bar = document.getElementById('boot-progress');
+        if (!bar) return;
+        let w = 0;
+        const interval = setInterval(() => {
+          w += Math.random() * 25 + 10;
+          if (w >= 100) {
+            w = 100;
+            clearInterval(interval);
+          }
+          bar.style.width = w + '%';
+        }, 120);
+      }
+    })();
+  </script>
 
   <script src="assets/js/main.js" defer type="module"></script>
 

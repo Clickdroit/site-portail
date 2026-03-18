@@ -1,2 +1,39 @@
-.env
+# Dependencies
 node_modules/
+
+# Environment
+.env
+.env.local
+.env.production
+
+# Database
+server/*.db
+server/*.sqlite
+server/*.sqlite3
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Docker
+docker-compose.override.yml
+
+# Coverage & tests
+coverage/
+.nyc_output/
+
+# Build output
+dist/

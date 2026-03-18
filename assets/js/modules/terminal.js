@@ -1,6 +1,7 @@
 /**
- * terminal.js — Terminal simulé avec historique localStorage et auto-complétion.
- * Commandes disponibles : help, list, open <n>, status, theme <dark|light>, clear.
+ * terminal.js — Terminal with WebSocket (Socket.io) support.
+ * Local commands: help, list, open, theme, clear
+ * Server commands (via WebSocket): status, ping, restart, deploy, logs
  */
 
 import { applyTheme, getTheme } from './theme.js';
@@ -11,8 +12,11 @@ const MAX_HISTORY = 50;
 
 let history = [];
 let historyIndex = -1;
+let socket = null;
 
-const COMMANDS = ['help', 'list', 'open', 'status', 'theme', 'clear'];
+const LOCAL_COMMANDS = ['help', 'list', 'open', 'theme', 'clear'];
+const SERVER_COMMANDS = ['status', 'ping', 'restart', 'deploy', 'logs'];
+const ALL_COMMANDS = [...LOCAL_COMMANDS, ...SERVER_COMMANDS];
 
 /** Initialise le terminal. */
 export function initTerminal() {
@@ -24,9 +28,67 @@ export function initTerminal() {
   if (!input || !output) return;
 
   printWelcome(output);
+  connectWebSocket(output);
 
   input.addEventListener('keydown', e => handleKey(e, input, output));
   input.addEventListener('input', handleAutocomplete);
+}
+
+/** Connect to the backend WebSocket. */
+function connectWebSocket(output) {
+  if (typeof io === 'undefined') {
+    updateWsStatus('off');
+    return;
+  }
+
+  const token = localStorage.getItem('portal-token');
+  const user = JSON.parse(localStorage.getItem('portal-user') || '{}');
+
+  socket = io({
+    auth: {
+      token,
+      username: user.username || 'guest',
+      role: user.role || 'guest'
+    },
+    reconnection: true,
+    reconnectionDelay: 2000
+  });
+
+  socket.on('connect', () => {
+    updateWsStatus('on');
+    printLine(output, '<span class="t-output t-muted">⚡ WebSocket connecté au serveur.</span>');
+  });
+
+  socket.on('disconnect', () => {
+    updateWsStatus('off');
+    printLine(output, '<span class="t-error">⚡ WebSocket déconnecté.</span>');
+  });
+
+  socket.on('terminal:output', (data) => {
+    const typeClass = {
+      success: 't-up',
+      error: 't-error',
+      warn: 't-degraded',
+      info: 't-output',
+      log: 't-muted'
+    };
+    const cls = typeClass[data.type] || 't-output';
+    printLine(output, `<span class="${cls}">${escapeHtml(data.text)}</span>`);
+    output.scrollTop = output.scrollHeight;
+  });
+
+  // Real-time health updates
+  socket.on('health:update', (updates) => {
+    // This event is handled by main.js via a custom event
+    window.dispatchEvent(new CustomEvent('health:update', { detail: updates }));
+  });
+}
+
+function updateWsStatus(state) {
+  const el = document.getElementById('ws-status');
+  if (!el) return;
+  el.className = `terminal-ws-status ws-${state}`;
+  el.title = state === 'on' ? 'WebSocket: connecté' : 'WebSocket: déconnecté';
 }
 
 /** Gère les touches clavier du terminal. */
@@ -37,7 +99,7 @@ async function handleKey(e, input, output) {
       pushHistory(cmd);
       historyIndex = -1;
       printLine(output, `<span class="t-prompt">❯</span> <span class="t-cmd">${escapeHtml(cmd)}</span>`);
-      const result = await execute(cmd);
+      const result = await execute(cmd, output);
       if (result) printLine(output, result);
     }
     input.value = '';
@@ -69,48 +131,77 @@ async function handleKey(e, input, output) {
   if (e.key === 'Tab') {
     e.preventDefault();
     const partial = input.value.trim();
-    const match = COMMANDS.find(c => c.startsWith(partial) && c !== partial);
+    const match = ALL_COMMANDS.find(c => c.startsWith(partial) && c !== partial);
     if (match) input.value = match + ' ';
   }
 }
 
-/** Placeholder pour l'auto-complétion visuelle (extension possible). */
+/** Placeholder pour l'auto-complétion visuelle. */
 function handleAutocomplete() {}
 
-/** Exécute une commande et retourne la sortie HTML. */
-async function execute(raw) {
+/** Exécute une commande. */
+async function execute(raw, output) {
   const parts = raw.trim().split(/\s+/);
   const cmd = parts[0].toLowerCase();
   const args = parts.slice(1);
 
+  // Check user role for restricted commands
+  const user = JSON.parse(localStorage.getItem('portal-user') || '{}');
+  const role = user.role || 'guest';
+
+  // Local commands
   switch (cmd) {
     case 'help':
-      return cmdHelp();
+      return cmdHelp(role);
     case 'list':
       return cmdList();
     case 'open':
       return cmdOpen(args);
-    case 'status':
-      return await cmdStatus();
     case 'theme':
       return cmdTheme(args);
     case 'clear':
       cmdClear();
       return null;
-    default:
-      return `<span class="t-error">Commande inconnue : <strong>${escapeHtml(cmd)}</strong>. Tapez <em>help</em> pour l'aide.</span>`;
   }
+
+  // Server commands via WebSocket
+  if (SERVER_COMMANDS.includes(cmd)) {
+    if (!socket || !socket.connected) {
+      return '<span class="t-error">WebSocket non connecté. Impossible d\'exécuter les commandes serveur.</span>';
+    }
+
+    // Role check for sensitive commands
+    if (['restart', 'deploy', 'logs'].includes(cmd) && role === 'guest') {
+      return '<span class="t-error">✗ Permission refusée. Rôle requis : admin ou devops.</span>';
+    }
+
+    socket.emit('terminal:command', { command: cmd, args });
+    return '<span class="t-muted">Envoi au serveur…</span>';
+  }
+
+  return `<span class="t-error">Commande inconnue : <strong>${escapeHtml(cmd)}</strong>. Tapez <em>help</em> pour l'aide.</span>`;
 }
 
-function cmdHelp() {
+function cmdHelp(role) {
+  let serverCmds = `
+  &nbsp;&nbsp;<em>status</em>       — statut des projets (serveur)<br>
+  &nbsp;&nbsp;<em>ping &lt;n&gt;</em>    — vérifier un projet (serveur)<br>`;
+
+  if (role === 'admin' || role === 'devops') {
+    serverCmds += `
+  &nbsp;&nbsp;<em>restart &lt;n&gt;</em> — redémarrer un conteneur<br>
+  &nbsp;&nbsp;<em>deploy &lt;n&gt;</em>  — déclencher un déploiement<br>
+  &nbsp;&nbsp;<em>logs &lt;n&gt;</em>    — voir les logs d'un projet<br>`;
+  }
+
   return `<span class="t-output">
-  <strong>Commandes disponibles :</strong><br>
+  <strong>Commandes locales :</strong><br>
   &nbsp;&nbsp;<em>help</em>         — affiche cette aide<br>
   &nbsp;&nbsp;<em>list</em>         — liste les projets<br>
   &nbsp;&nbsp;<em>open &lt;n&gt;</em>    — ouvre le projet n°n<br>
-  &nbsp;&nbsp;<em>status</em>       — uptime réel des conteneurs (API health)<br>
   &nbsp;&nbsp;<em>theme &lt;dark|light&gt;</em> — change le thème<br>
   &nbsp;&nbsp;<em>clear</em>        — vide le terminal<br>
+  <strong>Commandes serveur :</strong><br>${serverCmds}
   <span class="t-muted">Raccourcis: ↑/↓ historique · Tab complétion</span>
 </span>`;
 }
@@ -143,38 +234,6 @@ function cmdOpen(args) {
     return `<span class="t-error">Projet n°${n} introuvable. Utilisez <em>list</em> pour voir les projets.</span>`;
   }
   return `<span class="t-output">Ouverture de <strong>${escapeHtml(project.name)}</strong>…</span>`;
-}
-
-async function cmdStatus() {
-  try {
-    const res = await fetch('/api/v1/health', { cache: 'no-store' });
-    if (!res.ok) {
-      return `<span class="t-error">Health-check indisponible (HTTP ${res.status}).</span>`;
-    }
-
-    const data = await res.json();
-    const services = Array.isArray(data.services) ? data.services : [];
-
-    if (!services.length) {
-      const uptime = data.uptime ? ` — uptime global: <strong>${escapeHtml(String(data.uptime))}</strong>` : '';
-      return `<span class="t-output">Aucun détail service/conteneur fourni par l'endpoint /api/health${uptime}.</span>`;
-    }
-
-    const rows = services
-      .map(formatServiceStatusLine)
-      .join('<br>');
-
-    return `<span class="t-output"><strong>Status conteneurs :</strong><br>${rows}</span>`;
-  } catch {
-    return '<span class="t-error">Impossible de contacter /api/health.</span>';
-  }
-}
-
-function formatServiceStatusLine(service) {
-  const name = escapeHtml(service.name || service.id || service.url || 'service');
-  const uptime = escapeHtml(String(service.uptime ?? service.uptimeHuman ?? 'n/a'));
-  const status = escapeHtml(String(service.status ?? 'unknown').toUpperCase());
-  return `  <span class="t-muted">${name}</span> → <strong>${uptime}</strong> <span class="t-muted">(${status})</span>`;
 }
 
 function cmdTheme(args) {

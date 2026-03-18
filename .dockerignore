@@ -1,0 +1,13 @@
+.git
+.github
+node_modules
+server/node_modules
+server/*.db
+server/*.sqlite
+server/*.sqlite3
+server/.env
+*.md
+.dockerignore
+.gitignore
+coverage/
+.nyc_output/

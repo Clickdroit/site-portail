@@ -1,7 +1,9 @@
 /**
  * projects.js — Chargement et rendu dynamique des projets.
- * Gère aussi la recherche, le filtrage par tag et le tri.
+ * Gère la recherche, le filtrage par tag, le tri, et l'ouverture de la modale détail.
  */
+
+import { openProjectDetail } from './charts.js';
 
 let allProjects = [];
 let activeFilter = 'all';
@@ -10,15 +12,25 @@ let searchQuery = '';
 
 const STATUS_LABEL = { UP: 'UP', DEGRADED: 'DÉGRADÉ', DOWN: 'DOWN' };
 
-/** Charge les données depuis data/projects.json et initialise l'affichage. */
+/** Charge les données depuis l'API backend (fallback: data/projects.json). */
 export async function initProjects() {
   try {
-    const res = await fetch('data/projects.json');
+    const token = localStorage.getItem('portal-token');
+    const headers = token ? { 'Authorization': 'Bearer ' + token } : {};
+
+    const res = await fetch('/api/v1/projects', { headers });
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     allProjects = await res.json();
-  } catch (err) {
-    console.error('[projects] Impossible de charger data/projects.json :', err);
-    allProjects = [];
+  } catch {
+    // Fallback to static JSON
+    try {
+      const res = await fetch('data/projects.json');
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      allProjects = await res.json();
+    } catch (err) {
+      console.error('[projects] Impossible de charger les projets :', err);
+      allProjects = [];
+    }
   }
 
   buildTagFilters();
@@ -123,18 +135,31 @@ export function renderProjects() {
   }
 
   projects.forEach((project, index) => {
-    grid.appendChild(createCard(project, index));
+    // Use Web Component if available, otherwise fallback to vanilla
+    if (customElements.get('project-card')) {
+      const card = document.createElement('project-card');
+      card.projectData = project;
+      card.style.setProperty('--i', index);
+      card.addEventListener('project-click', (e) => {
+        e.preventDefault();
+        openProjectDetail(e.detail);
+      });
+      grid.appendChild(card);
+    } else {
+      grid.appendChild(createCard(project, index));
+    }
   });
 }
 
-/** Crée une carte projet. */
+/** Crée une carte projet (fallback vanilla). */
 function createCard(project, index) {
-  const a = document.createElement('a');
-  a.className = 'card';
-  a.href = project.url;
-  a.style.setProperty('--i', index);
-  a.setAttribute('aria-label', `${project.name} — statut : ${STATUS_LABEL[project.status] || project.status}`);
-  a.dataset.projectId = project.id;
+  const div = document.createElement('div');
+  div.className = 'card';
+  div.style.setProperty('--i', index);
+  div.setAttribute('role', 'button');
+  div.setAttribute('tabindex', '0');
+  div.setAttribute('aria-label', `${project.name} — statut : ${STATUS_LABEL[project.status] || project.status}`);
+  div.dataset.projectId = project.id;
 
   const statusClass = `status--${project.status.toLowerCase()}`;
   const statusLabel = STATUS_LABEL[project.status] || project.status;
@@ -144,7 +169,7 @@ function createCard(project, index) {
     .map(t => `<span class="tag" aria-label="Tag : ${t}">${t}</span>`)
     .join('');
 
-  a.innerHTML = `
+  div.innerHTML = `
     <div class="card__header">
       <span class="card__num" aria-hidden="true">${num}</span>
       <span class="status-badge ${statusClass}" aria-label="Statut : ${statusLabel}">${statusLabel}</span>
@@ -153,14 +178,27 @@ function createCard(project, index) {
     <p class="card__desc">${escapeHtml(project.description)}</p>
     <div class="card__tags" aria-label="Technologies">${tagsHtml}</div>
     <span class="card__arrow" aria-hidden="true">
-      Visiter
+      Détails
       <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
         <polyline points="9 18 15 12 9 6"/>
       </svg>
     </span>
   `;
 
-  return a;
+  // Open modal on click
+  div.addEventListener('click', (e) => {
+    e.preventDefault();
+    openProjectDetail(project);
+  });
+
+  div.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault();
+      openProjectDetail(project);
+    }
+  });
+
+  return div;
 }
 
 /** Retourne les projets chargés (pour le terminal). */
@@ -209,7 +247,7 @@ export function updateProjectHealth(updates = []) {
 export function openProject(num) {
   const project = allProjects[num - 1];
   if (project) {
-    window.location.href = project.url;
+    openProjectDetail(project);
     return project;
   }
   return null;

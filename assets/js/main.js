@@ -1,24 +1,180 @@
 /**
  * main.js — Point d'entrée principal.
- * Initialise les modules, les métriques mockées, la timeline et les raccourcis clavier.
+ * Initialise les modules, l'authentification, les métriques, la timeline et les raccourcis.
  */
 
 import { initTheme, toggleTheme } from './modules/theme.js';
 import { initTerminal } from './modules/terminal.js';
 import { getProjects, initProjects, openProject, updateProjectHealth } from './modules/projects.js';
+import { initCharts } from './modules/charts.js';
 
 // ── Initialisation ────────────────────────────────────────────────────────────
 
 document.addEventListener('DOMContentLoaded', async () => {
+  // Soft auth check — no redirect, dashboard is public
+  await checkAuth();
+
   initTheme();
   await initProjects();
   initTerminal();
+  initCharts();
   initHealthMonitoring();
   initTimeline();
   initKeyboardShortcuts();
   initYear();
   initClipboard();
+  initAuthUI();
+  showUserInfo();
+
+  // Listen for WebSocket health updates
+  window.addEventListener('health:update', (e) => {
+    if (e.detail) {
+      updateProjectHealth(e.detail);
+      pushStatusChangeLogs();
+    }
+  });
 });
+
+// ── Auth ──────────────────────────────────────────────────────────────────────
+
+async function checkAuth() {
+  const token = localStorage.getItem('portal-token');
+  if (!token) return false;
+
+  try {
+    const res = await fetch('/api/v1/auth/me', {
+      headers: { 'Authorization': 'Bearer ' + token }
+    });
+    if (!res.ok) {
+      localStorage.removeItem('portal-token');
+      localStorage.removeItem('portal-user');
+      return false;
+    }
+    const user = await res.json();
+    localStorage.setItem('portal-user', JSON.stringify(user));
+    return true;
+  } catch {
+    // Server might be down, allow access with existing token
+    return !!localStorage.getItem('portal-user');
+  }
+}
+
+function showUserInfo() {
+  const user = JSON.parse(localStorage.getItem('portal-user') || '{}');
+  const container = document.getElementById('header-user');
+  const usernameEl = document.getElementById('header-username');
+  const roleEl = document.getElementById('header-role');
+  const logoutBtn = document.getElementById('logout-btn');
+  const loginBtn = document.getElementById('login-btn');
+
+  if (user.username) {
+    // Logged in: show user info + logout
+    if (container) container.style.display = 'flex';
+    if (usernameEl) usernameEl.textContent = user.username;
+    if (roleEl) {
+      roleEl.textContent = user.role.toUpperCase();
+      roleEl.className = `header__role-badge role-${user.role}`;
+    }
+    if (logoutBtn) logoutBtn.style.display = 'flex';
+    if (loginBtn) loginBtn.style.display = 'none';
+  } else {
+    // Guest: show login button
+    if (container) container.style.display = 'none';
+    if (logoutBtn) logoutBtn.style.display = 'none';
+    if (loginBtn) loginBtn.style.display = 'flex';
+  }
+}
+
+function initAuthUI() {
+  // Login button opens the modal
+  const loginBtn = document.getElementById('login-btn');
+  if (loginBtn) {
+    loginBtn.addEventListener('click', () => openLoginModal());
+  }
+
+  // Logout button
+  const logoutBtn = document.getElementById('logout-btn');
+  if (logoutBtn) {
+    logoutBtn.addEventListener('click', () => {
+      localStorage.removeItem('portal-token');
+      localStorage.removeItem('portal-user');
+      showUserInfo();
+      window.location.reload();
+    });
+  }
+
+  // Login form submission
+  const form = document.getElementById('login-form');
+  if (form) {
+    form.addEventListener('submit', handleLogin);
+  }
+
+  // Close modal
+  const closeBtn = document.getElementById('login-modal-close');
+  if (closeBtn) closeBtn.addEventListener('click', closeLoginModal);
+
+  const backdrop = document.getElementById('login-modal');
+  if (backdrop) {
+    backdrop.addEventListener('click', (e) => {
+      if (e.target === backdrop) closeLoginModal();
+    });
+  }
+}
+
+function openLoginModal() {
+  const modal = document.getElementById('login-modal');
+  if (modal) {
+    modal.setAttribute('aria-hidden', 'false');
+    modal.classList.add('modal--open');
+    document.body.style.overflow = 'hidden';
+    const input = document.getElementById('login-username');
+    if (input) setTimeout(() => input.focus(), 100);
+  }
+}
+
+function closeLoginModal() {
+  const modal = document.getElementById('login-modal');
+  if (modal) {
+    modal.setAttribute('aria-hidden', 'true');
+    modal.classList.remove('modal--open');
+    document.body.style.overflow = '';
+  }
+}
+
+async function handleLogin(e) {
+  e.preventDefault();
+  const errorEl = document.getElementById('login-error');
+  const btn = document.getElementById('login-submit');
+  if (errorEl) errorEl.textContent = '';
+  if (btn) { btn.disabled = true; btn.textContent = 'Connexion…'; }
+
+  const username = document.getElementById('login-username')?.value.trim();
+  const password = document.getElementById('login-password')?.value;
+
+  try {
+    const res = await fetch('/api/v1/auth/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ username, password })
+    });
+    const data = await res.json();
+
+    if (!res.ok) {
+      if (errorEl) errorEl.textContent = data.error || 'Erreur de connexion.';
+      if (btn) { btn.disabled = false; btn.textContent = 'Se connecter'; }
+      return;
+    }
+
+    localStorage.setItem('portal-token', data.token);
+    localStorage.setItem('portal-user', JSON.stringify(data.user));
+    closeLoginModal();
+    showUserInfo();
+    window.location.reload();
+  } catch {
+    if (errorEl) errorEl.textContent = 'Impossible de contacter le serveur.';
+    if (btn) { btn.disabled = false; btn.textContent = 'Se connecter'; }
+  }
+}
 
 // ── Année dans le footer ──────────────────────────────────────────────────────
 
@@ -40,7 +196,6 @@ async function initHealthMonitoring() {
 async function refreshHealth() {
   const startedAt = performance.now();
   const healthData = await fetchHealthData();
-  // Évite une latence "0 ms" visuellement trompeuse lors d'une réponse quasi instantanée.
   const elapsedMs = Math.max(1, Math.round(performance.now() - startedAt));
 
   if (healthData) {
@@ -55,14 +210,17 @@ async function refreshHealth() {
   updateMetric('metric-latency', latency);
   updateMetric('metric-requests', formatRequests(requests));
 
-  const updates = healthData?.services ?? (await probeProjectUrls());
+  const updates = healthData?.services ?? [];
   updateProjectHealth(updates);
   pushStatusChangeLogs();
 }
 
 async function fetchHealthData() {
   try {
-    const res = await fetch('/api/v1/health', { cache: 'no-store' });
+    const token = localStorage.getItem('portal-token');
+    const headers = token ? { 'Authorization': 'Bearer ' + token } : {};
+
+    const res = await fetch('/api/v1/health', { cache: 'no-store', headers });
     if (!res.ok) return null;
     const data = await res.json();
 
@@ -87,41 +245,12 @@ async function fetchHealthData() {
   }
 }
 
-async function probeProjectUrls() {
-  const projects = getProjects();
-  if (!projects.length) return [];
-
-  const checks = projects.map(async project => {
-    const status = await checkProjectUrl(project.url);
-    return {
-      id: project.id,
-      name: project.name,
-      url: project.url,
-      status
-    };
-  });
-
-  return Promise.all(checks);
-}
-
-async function checkProjectUrl(url) {
-  try {
-    const res = await fetch(url, { method: 'HEAD', cache: 'no-store' });
-    if (res.ok) return 'UP';
-    if (res.status >= 500) return 'DOWN';
-    return 'DEGRADED';
-  } catch {
-    return 'DOWN';
-  }
-}
-
 function updateMetric(id, value) {
   const el = document.getElementById(id);
   if (!el) return;
   if (el.textContent === value) return;
   el.textContent = value;
   el.classList.remove('metric--updated');
-  // Force un reflow pour redémarrer l'animation CSS quand la valeur change.
   void el.offsetWidth;
   el.classList.add('metric--updated');
 }
@@ -136,7 +265,7 @@ function initTimeline() {
   if (!timelineContainer) return;
 
   addLogEntry(timelineContainer, 'INFO', 'Portail démarré avec succès.');
-  addLogEntry(timelineContainer, 'INFO', 'Données projets chargées depuis data/projects.json.');
+  addLogEntry(timelineContainer, 'INFO', 'Backend API connecté.');
 
   getProjects().forEach(project => {
     projectStatusById.set(project.id, project.status);
@@ -184,24 +313,20 @@ let gTimeout = null;
 
 function initKeyboardShortcuts() {
   document.addEventListener('keydown', e => {
-    // Ne pas intercepter si focus sur input/textarea/select
     const tag = document.activeElement?.tagName;
     const inField = tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT';
 
-    // / — focus recherche
     if (e.key === '/' && !inField) {
       e.preventDefault();
       document.getElementById('search')?.focus();
       return;
     }
 
-    // t — changer thème (hors champs)
     if (e.key === 't' && !inField) {
       toggleTheme();
       return;
     }
 
-    // g suivi de 1-9 — ouvrir projet
     if (e.key === 'g' && !inField) {
       gPressed = true;
       clearTimeout(gTimeout);
@@ -217,7 +342,6 @@ function initKeyboardShortcuts() {
       return;
     }
 
-    // Escape — vider la recherche et retirer le focus
     if (e.key === 'Escape' && inField && document.activeElement?.id === 'search') {
       document.activeElement.value = '';
       document.activeElement.dispatchEvent(new Event('input'));
@@ -226,7 +350,7 @@ function initKeyboardShortcuts() {
   });
 }
 
-// ── Presse-papiers (avec fallback) ───────────────────────────────────────────
+// ── Presse-papiers ───────────────────────────────────────────────────────────
 
 function initClipboard() {
   document.querySelectorAll('[data-copy]').forEach(btn => {
@@ -236,7 +360,6 @@ function initClipboard() {
         if (navigator.clipboard?.writeText) {
           await navigator.clipboard.writeText(text);
         } else {
-          // Fallback : sélection temporaire
           const ta = document.createElement('textarea');
           ta.value = text;
           ta.style.position = 'fixed';
@@ -256,6 +379,8 @@ function initClipboard() {
     });
   });
 }
+
+// ── Utilitaires ──────────────────────────────────────────────────────────────
 
 function escapeHtml(str) {
   return String(str)
